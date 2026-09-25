@@ -1,0 +1,4 @@
+# ChromaDB index files are binary: never convert line endings
+data/chroma/** binary
+*.sqlite3 binary
+*.bin binary
