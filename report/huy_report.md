@@ -4,8 +4,8 @@
 
 | Thông tin         | Nội dung                  |
 | ------------------ | -------------------------- |
-| Họ và tên       | Huy                     |
-| MSSV               | [MSSV]                     |
+| Họ và tên       | Nguyễn Quang Huy                     |
+| MSSV               | 2A202602421                   |
 | Khóa/Lớp         | K4              |
 | Tên nhóm         | Tralalelo Tralala     |
 | Vai trò chính    | Trưởng nhóm · RAG & Vector Index · Benchmark Test Set |
@@ -143,5 +143,5 @@ Kết quả nào khác với kỳ vọng ban đầu?
 - [ ] Báo cáo không chứa `.env`, API key, token hoặc secret.
 - [ ] Báo cáo này không phải bản sao nguyên văn của báo cáo nhóm hoặc báo cáo thành viên khác.
 
-**Họ và tên:** Huy
+**Họ và tên:** Nguyễn Quang Huy
 **Ngày xác nhận:** [YYYY-MM-DD]
