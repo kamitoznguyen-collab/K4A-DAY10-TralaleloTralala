@@ -22,15 +22,18 @@
 
 ## # Cá nhân
 
-### ## Huy
+### ## Nguyễn Quang Huy-2A202602421
 - **Vai trò:** Trưởng nhóm · Phụ trách RAG, Vector Database & Benchmark Test Set.
 - **Công việc chi tiết đã hoàn thành:**
-  - Phân công công việc, theo dõi tiến độ các nhánh, review & merge PR vào `main`.
-  - Xây dựng bộ 10 câu hỏi benchmark (đủ 4 loại `summary` / `authors` / `date` / `categories`) trong `src/evaluation/testset.py`.
+  - Phân công công việc, theo dõi tiến độ các nhánh, review & merge PR vào `main`; tích hợp nhánh của Khánh và Lan (giải quyết conflict `TEAM.md`, `quality.py`).
+  - Xây dựng bộ 10 câu hỏi benchmark (đủ 4 loại `summary` / `authors` / `date` / `categories`) trong `src/evaluation/testset.py`, chọn tất định và luôn gồm bài mới nhất.
   - Sửa manifest index lưu `persist_path` tương đối trong `src/retrieval/index.py` để chạy được trên máy khác.
-  - Kiểm tra ChromaDB `papers-baseline` đủ 24 docs, baseline `retrieval_hit_rate = 1.0`; kiểm tra `agent.py` với provider `mock`.
+  - Kiểm tra 3 collection ChromaDB tách biệt (`papers-baseline` 24 / `papers-corrupted` 22 / `papers-repaired` 24 docs); kiểm tra `agent.py` với provider `mock`.
+  - Viết báo cáo cá nhân tại `report/huy_report.md`.
 - **Điều học được / Đóng góp chính:**
-  - _(tự điền)_
+  - Test set phải cố định và có ground-truth doc id thì mới so sánh được Baseline / Corrupted / Repaired: `retrieval_hit_rate` 1.0 → 0.8 → 1.0 cho thấy rõ tác động của `drop_latest`.
+  - Hiện tượng silent failure: khi mất tài liệu, agent vẫn trả lời tự tin từ tài liệu khác và judge heuristic vẫn chấm đúng (`judge_accuracy` giữ 1.0), nên cần GX + freshness chặn trước vector DB.
+  - Artifact commit vào repo phải độc lập với máy chạy (đường dẫn tương đối), nếu không sẽ không tái lập được trên máy giám khảo.
 
 ### ## Quân
 - **Vai trò:** Pipeline Integrator.
