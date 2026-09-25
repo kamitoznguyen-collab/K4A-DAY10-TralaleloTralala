@@ -14,9 +14,24 @@
 | File `.env` | ⚠️ | Đã có, `LLM_PROVIDER=gemini` nhưng **mọi API key đều trống** → `build_llm()` sẽ raise. Không có key thì đặt `LLM_PROVIDER=mock`. **Không commit `.env`** (-20đ). |
 | `data/raw/crossref_response.json` | ✅ | 24 items, `abstract` có tag `<jats:p>` cần bóc. |
 | `data/raw/crossref_records.json` | ✅ | 24 records, `published` từ 2026-03-28 → 2026-07-22. |
-| `src/ingestion/crossref.py`, `cleaning.py` | ✅ | Việt Anh đã merge vào `main` (commit `d0ea007`): đủ 3 hàm Crossref + `build_clean_dataframe`. |
+| `src/ingestion/crossref.py`, `cleaning.py` | ✅ | Đã có trên `main`. Lưu ý: PR #1 của Quân (`2469afd`) đã **ghi đè** bản của Việt Anh (`d0ea007`) → Việt Anh kiểm tra lại bản hiện tại. |
 
-**Kết luận:** phần code CP0/CP1 của Việt Anh đã có trên `main`. Mỗi người còn phải tự setup môi trường (Python + `.venv` + `.env`) rồi chạy lệnh nghiệm thu CP0/CP1 để xác nhận.
+**Kết luận:** code CP0/CP1 đã có trên `main`. Mỗi người còn phải tự setup môi trường (Python + `.venv` + `.env`) rồi chạy lệnh nghiệm thu CP0/CP1 để xác nhận.
+
+### Tiến độ trên `main` (cập nhật 25/09/2026, commit `2469afd`)
+
+| File | Người phụ trách | Trên `main` | Ghi chú |
+| :--- | :--- | :---: | :--- |
+| `src/ingestion/crossref.py` | Việt Anh | ✅ | bản của Quân (PR #1) |
+| `src/ingestion/cleaning.py` | Việt Anh | ✅ | bản của Quân (PR #1) |
+| `src/observability/quality.py` | Khánh | ✅ | bản của Quân (PR #1). Nhánh `feat/khanh-observability` cũng sửa file này → **sẽ conflict**, cần thống nhất giữ bản nào |
+| `src/observability/reporting.py` | Khánh | ❌ | đã làm xong trên `feat/khanh-observability`, chưa merge |
+| `src/evaluation/testset.py` | Huy | ❌ | còn `NotImplementedError` |
+| `src/retrieval/index.py` (path tương đối) | Huy | ❌ | manifest vẫn lưu path tuyệt đối |
+| `src/ingestion/corruption.py` | Lan | ❌ | còn `NotImplementedError` |
+| `src/pipelines/phase1.py` | Quân | ❌ | còn `NotImplementedError` |
+| `src/pipelines/corruption_flow.py` | Quân | ❌ | còn `NotImplementedError` |
+| `tests/` | Lan | ❌ | chưa có |
 
 ### Setup môi trường (mọi thành viên đều làm)
 ```powershell
