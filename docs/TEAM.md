@@ -10,11 +10,11 @@
 
 | STT | Họ và tên | MSSV | Email | Vai trò & Phân công công việc | Báo cáo cá nhân |
 |---:|---|---|---|---|---|
-| 1 | Huy | | | Trưởng nhóm · RAG & Vector Index (`retrieval/index.py`, `testset.py`, ChromaDB), review & merge PR | `report/huy_report.md` |
-| 2 | Quân | | | Pipeline Integrator (`core/`, `phase1.py`, `corruption_flow.py`) | `report/quan_report.md` |
-| 3 | Việt Anh | | | Data Ingestion & Cleaning (`crossref.py`, `cleaning.py`, raw data) | `report/vietanh_report.md` |
-| 4 | Nguyễn Khánh | | nguynkhanh57.9@gmail.com | Data Observability & Reporting (`quality.py` GX 1.x, `reporting.py`, Dashboard) | `report/khanh_report.md` |
-| 5 | Lan | | | Corruption Suite & Testing (`corruption.py`, `tests/` pytest) | `report/Lan.md` |
+| 1 | Nguyễn Quang Huy |2A202602421 |kamitoznguyen@gmail.com | Trưởng nhóm · RAG & Vector Index (`retrieval/index.py`, `testset.py`, ChromaDB), review & merge PR | `report/huy_report.md` |
+| 2 | Lại Bá Quân |2A202602495 |minhquantck@gmail.com | Pipeline Integrator (`core/`, `phase1.py`, `corruption_flow.py`) | `report/quan_report.md` |
+| 3 | Đỗ Lê Việt Anh |2A202602491 |dlvietanh2k4@gmail.com | Data Ingestion & Cleaning (`crossref.py`, `cleaning.py`, raw data) | `report/vietanh_report.md` |
+| 4 | Nguyễn Thị Minh Khánh |2A202602546 | nguynkhanh57.9@gmail.com | Data Observability & Reporting (`quality.py` GX 1.x, `reporting.py`, Dashboard) | `report/khanh_report.md` |
+| 5 | Trần Thị Lan |2A202602621 |2211090020@studenthuph.edu.vn | Corruption Suite & Testing (`corruption.py`, `tests/` pytest) | `report/Lan.md` |
 
 *(Mỗi thành viên tự điền MSSV, email và phần cá nhân của mình bên dưới; mọi người phải có commit trên `main`.)*
 
