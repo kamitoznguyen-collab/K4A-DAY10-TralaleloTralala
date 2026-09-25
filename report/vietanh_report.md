@@ -29,7 +29,7 @@ Phần của mình là **đầu nguồn** của pipeline: mọi module phía sau
 
 | Hoạt động                         | Thành viên/module được hỗ trợ | Kết quả                    |
 | ------------------------------------ | ------------------------------------ | ---------------------------- |
-| Kiểm tra luồng repair (clean lại từ raw) | Quân · `corruption_flow.py` (CP5) | Chạy thử ngoài repo: `load_raw_records` → `build_clean_dataframe` cho lại 24 dòng, GX `True`, metric bằng baseline. `corruption_flow.py` chính thức vẫn còn `NotImplementedError` tại thời điểm viết báo cáo. |
+| Kiểm tra luồng repair (clean lại từ raw) | Quân · `corruption_flow.py` (CP5) | Bước repair của Quân gọi lại đúng `load_raw_records` + `build_clean_dataframe` của mình. Chạy `python script/run_corruption_flow.py` → repaired 24 dòng, GX 7/7, metric bằng baseline; chạy lần 2 cho `repaired_metrics.json` và `repaired_answers.json` giống hệt từng byte (idempotent). |
 
 ## 3. Kết quả theo vai trò
 
@@ -82,10 +82,11 @@ python -c "from core.config import load_settings; from ingestion.crossref import
 python -c "from datetime import datetime, timezone; from core.config import load_settings; from ingestion.crossref import load_raw_records; from ingestion.cleaning import build_clean_dataframe; s=load_settings(); df=build_clean_dataframe(load_raw_records(s.paths.raw_records_json), datetime.now(timezone.utc)); print(f'Tín hiệu hoàn thành: Clean thành công {len(df)} dòng')"
 git status --short data/raw/   # không có thay đổi sau khi fetch ghi lại crossref_records.json
 LLM_PROVIDER=mock python script/run_phase1.py
+LLM_PROVIDER=mock python script/run_corruption_flow.py   # chạy 2 lần, so sánh repaired_metrics.json
 ```
 
 - **Kết quả mong đợi:** `Môi trường sẵn sàng`, `Đã tải 24 bài báo`, `Clean thành công 24 dòng`; `crossref_records.json` sau khi ghi lại không đổi; phase 1 chạy hết với 24 docs.
-- **Kết quả thực tế:** Đúng như mong đợi (Python 3.12.10 trong `.venv`). Output của `parse_crossref_payload` trùng 24/24 record với snapshot. Test thêm: record trùng giữ bản `updated` mới hơn, whitespace thừa được chuẩn hóa, ngày `"not a date"` → `published = ""`, title rỗng bị loại; giả lập API trả 429 (3 lần gọi) và `ConnectionError` → cả hai fallback về snapshot, vẫn ra 24 record. Phase 1: `ChromaDB collection 'papers-baseline' indexed with 24 documents`, GX `PASSED`, freshness `COMPLIANT (4.2%)`.
+- **Kết quả thực tế:** Đúng như mong đợi (Python 3.12.10 trong `.venv`). Output của `parse_crossref_payload` trùng 24/24 record với snapshot. Test thêm: record trùng giữ bản `updated` mới hơn, whitespace thừa được chuẩn hóa, ngày `"not a date"` → `published = ""`, title rỗng bị loại; giả lập API trả 429 (3 lần gọi) và `ConnectionError` → cả hai fallback về snapshot, vẫn ra 24 record. Phase 1: `ChromaDB collection 'papers-baseline' indexed with 24 documents`, GX `PASSED`, freshness `COMPLIANT (4.2%)`. Corruption flow: `Repaired data cleanly rebuilt (24 rows)`, `IDEMPOTENT REPAIR VERIFIED`; lần chạy thứ 2 thoát với exit code 0 và `repaired_metrics.json` không đổi.
 - **Artifact/log:** `data/raw/crossref_response.json`, `data/raw/crossref_records.json`, `data/clean/papers_clean.json`, `data/results/baseline_metrics.json`, `data/quality/freshness_report.json`. Commit: `d0ea007 feat(ingestion): implement Crossref ingestion and cleaning (CP0, CP1)`.
 
 ## 5. Một quyết định kỹ thuật quan trọng
@@ -96,7 +97,7 @@ LLM_PROVIDER=mock python script/run_phase1.py
   2. Mặc định đọc snapshot, chỉ gọi API khi bật `REFRESH_SOURCE=1`; API lỗi thì vẫn fallback snapshot.
 - **Phương án đã chọn:** Phương án 2.
 - **Lý do:** Với phương án 1, mỗi lần chạy thành công sẽ **ghi đè** `crossref_response.json` bằng tập bài khác → test set không còn khớp tài liệu, metric baseline/corrupted/repaired không so sánh được, và lần chạy repair không idempotent. Phương án 2 ưu tiên reproducibility; vẫn giữ được khả năng lấy dữ liệu mới có kiểm soát (cả nhóm thống nhất mới bật cờ). Ngoài ra raw response chỉ bị ghi khi API trả 200, nên một lần gọi lỗi không bao giờ làm hỏng bản gốc.
-- **Bằng chứng quyết định phù hợp:** Sau khi chạy lệnh CP0, `git status` không thấy thay đổi trong `data/raw/`. Baseline (chạy chính thức qua `run_phase1.py`) và Repaired (chạy thử lại từ cùng raw snapshot) cho metric giống hệt nhau: hit rate 1.0, token F1 1.0, judge score 5.
+- **Bằng chứng quyết định phù hợp:** Sau khi chạy lệnh CP0, `git status` không thấy thay đổi trong `data/raw/`. Baseline (`run_phase1.py`) và Repaired (`run_corruption_flow.py`, clean lại từ cùng raw snapshot) cho metric giống hệt nhau: hit rate 1.0, token F1 1.0, judge score 5. Chạy `run_corruption_flow.py` hai lần cho `repaired_metrics.json` giống hệt từng byte.
 
 ## 6. Một lỗi hoặc blocker đã xử lý
 
@@ -125,7 +126,7 @@ Vấn đề còn mở:
 
 ## 8. Phân tích kết quả
 
-> **Nguồn số liệu:** `main` @ `4176f11`, `LLM_PROVIDER=mock`, ngày chạy 2026-09-25. Cột **Baseline** lấy từ `python script/run_phase1.py` (`data/results/baseline_metrics.json`, `data/quality/freshness_report.json`). Vì `script/run_corruption_flow.py` chưa hoàn thiện, cột **Corrupted/Repaired** được mình đo bằng một script chạy thử ngoài repo theo đúng luồng CP5: `corrupt_clean_dataframe` trên DataFrame baseline → build index → `evaluate_pipeline` → GX + freshness; repair = `load_raw_records` + `build_clean_dataframe` lại từ `crossref_records.json`; cùng test set 10 câu `data/eval/test_set.json`. Số liệu trùng với bảng trong `report/huy_report.md`.
+> **Nguồn số liệu:** `main` @ `48ab9c3`, `LLM_PROVIDER=mock`, ngày chạy 2026-09-25. Cột **Baseline** lấy từ `python script/run_phase1.py` (`data/results/baseline_metrics.json`, `data/quality/baseline_quality_report.json`, `data/quality/freshness_report.json`). Cột **Corrupted/Repaired** lấy từ `python script/run_corruption_flow.py` (`data/results/corrupted_metrics.json`, `repaired_metrics.json`, `corruption_log.json`, `data/quality/corrupted_*`/`repaired_*`, `data/reports/corruption_report.md`). Cả 3 trạng thái dùng chung test set 10 câu `data/eval/test_set.json`.
 
 ### Metrics chính
 
@@ -135,7 +136,7 @@ Vấn đề còn mở:
 | `mean_token_f1`      |      1.0 |    0.9741 |      1.0 | Tụt ít: agent vẫn trả lời bằng tài liệu gần giống |
 | `judge_accuracy`     |      1.0 |       1.0 |      1.0 | Không phản ánh lỗi (judge heuristic khi chạy `mock`) |
 | `mean_judge_score`   |        5 |       4.8 |        5 | Chỉ 1 câu bị chấm thấp hơn |
-| Quality checks (GX)    |   `True` |   `False` |   `True` | Corrupted fail 3 expectation: unique `paper_id`, độ dài `summary`, độ dài `title` |
+| Quality checks (GX)    |   `True` (7/7) |   `False` (4/7) |   `True` (7/7) | Corrupted fail 3 expectation: unique `paper_id`, độ dài `summary`, độ dài `title` |
 | Freshness status       | `True` (1/24 stale, 4.17%) | `False` (6/22 stale, 27.27%) | `True` (1/24 stale, 4.17%) | `stale_date` đẩy tỉ lệ vượt ngưỡng 25% |
 
 Corruption log: `drop_latest` 4 dòng, `blank_summary` 3, `inject_noise` 3, `truncate_title` 3, `stale_date` 4, `duplicate_rows` 2 → 24 → 22 dòng.
