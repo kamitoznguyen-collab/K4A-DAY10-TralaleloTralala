@@ -1,7 +1,7 @@
 # Baseline Data Pipeline & Observability Report (Phase 1)
 
 > **Pipeline Phase:** Phase 1 — Clean Baseline & Ingestion Verification  
-> **Generated At:** `2026-09-25T10:21:50.658811+00:00`  
+> **Generated At:** `2026-09-25T10:49:05.481374+00:00`  
 > **Environment:** Ephemeral Great Expectations 1.x + Local ChromaDB Vector Index  
 > **Author Role:** Observability & Reporting Lead (Khánh)
 
@@ -83,7 +83,7 @@ Using ChromaDB collection `papers-baseline` with sentence-transformer `all-MiniL
 | **Retrieval Hit Rate** | **100.0%** | Fraction of queries where ground-truth document was retrieved in Top-K |
 | **Mean Token F1** | **1.0000** | Unigram token overlap between RAG response and ground truth |
 | **Judge Accuracy** | **100.0%** | LLM judge binary accuracy score |
-| **Mean Judge Score** | **5.0000** | Normalized scalar quality score (0.0 – 1.0) |
+| **Mean Judge Score** | **5.0000** | Mean judge score on a 1 – 5 scale (5 = fully correct) |
 
 ### RAGAS Metrics\n```json\n{'skipped': 'Set RUN_RAGAS=1 to enable the slower Ragas pass.'}\n```
 
