@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict
-from datetime import date, datetime
-
+from datetime import datetime
 import pandas as pd
 
 from core.utils import compact_join, normalize_whitespace
@@ -68,36 +66,92 @@ def build_text_for_embedding(row: pd.Series | dict) -> str:
 
 
 def build_clean_dataframe(records: list[PaperRecord], run_date: datetime) -> pd.DataFrame:
-    """Clean raw records into a dataframe ready for embedding.
+    """Clean raw records thành DataFrame chuẩn hóa sẵn sàng để embed và đánh giá.
 
-    Text is whitespace-normalized, dates become `YYYY-MM-DD` strings (`""` when missing, since ChromaDB
-    metadata rejects Timestamp/None), rows without `paper_id`/`title` are dropped, duplicates on
-    `paper_id` keep the most recently updated copy, and the result is sorted newest first.
+    1. Normalize title, summary, authors, categories.
+    2. Parse published/updated date.
+    3. Tính age_days = (run_date - published).days.
+    4. Tạo các cột helper:
+       - authors_joined
+       - categories_joined
+       - summary_chars
+       - text_for_embedding (cấu trúc 5 phần: Title, Authors, Published, Categories, Summary)
+    5. Drop duplicates theo paper_id và lọc các dòng lỗi (thiếu id/title hoặc summary quá ngắn).
+    6. Sort DataFrame và trả về kết quả.
     """
-    df = pd.DataFrame([asdict(record) for record in records], columns=CLEAN_COLUMNS[:11])
+    rows: list[dict] = []
+    run_date_val = run_date.date() if isinstance(run_date, datetime) else run_date
 
-    for column in _TEXT_COLUMNS:
-        df[column] = df[column].map(_normalize_text)
-    df["authors"] = df["authors"].map(_normalize_list)
-    df["categories"] = df["categories"].map(_normalize_list)
-    df["primary_category"] = [
-        primary or (categories[0] if categories else "")
-        for primary, categories in zip(df["primary_category"], df["categories"])
-    ]
-    df["published"] = df["published"].map(_normalize_date)
-    df["updated"] = df["updated"].map(_normalize_date)
-    df["updated"] = df["updated"].where(df["updated"] != "", df["published"])
+    for r in records:
+        paper_id = r.paper_id.strip()
+        title = " ".join(r.title.split()).strip()
+        summary = " ".join(r.summary.split()).strip()
+        authors = [" ".join(a.split()).strip() for a in r.authors if a.strip()]
+        categories = [" ".join(c.split()).strip() for c in r.categories if c.strip()]
+        primary_category = (
+            r.primary_category.strip()
+            if r.primary_category
+            else (categories[0] if categories else "General")
+        )
+        published = r.published.strip()
+        updated = r.updated.strip() if r.updated else published
+        abs_url = r.abs_url.strip()
+        pdf_url = r.pdf_url.strip()
+        comment = r.comment.strip()
 
-    df = df[(df["paper_id"] != "") & (df["title"] != "")]
-    df = df.sort_values(["paper_id", "updated"], ascending=[True, False], kind="stable")
-    df = df.drop_duplicates(subset="paper_id", keep="first")
+        authors_joined = ", ".join(authors)
+        categories_joined = ", ".join(categories)
+        summary_chars = len(summary)
 
-    run_day = run_date.date()
-    df["age_days"] = df["published"].map(lambda published: _age_days(published, run_day)).astype(int)
-    df["authors_joined"] = df["authors"].map(compact_join)
-    df["categories_joined"] = df["categories"].map(compact_join)
-    df["summary_chars"] = df["summary"].str.len().astype(int)
-    df["text_for_embedding"] = df.apply(build_text_for_embedding, axis=1)
+        # Tính age_days dựa trên ngày xuất bản
+        try:
+            pub_date = datetime.fromisoformat(published[:10]).date()
+            age_days = max(0, (run_date_val - pub_date).days)
+        except Exception:
+            age_days = 0
 
-    df = df.sort_values(["published", "paper_id"], ascending=[False, True], kind="stable")
-    return df[CLEAN_COLUMNS].reset_index(drop=True)
+        # Ghép text_for_embedding theo mẫu chuẩn 5 phần
+        text_for_embedding = (
+            f"Title: {title}\n"
+            f"Authors: {authors_joined}\n"
+            f"Published: {published}\n"
+            f"Categories: {categories_joined}\n"
+            f"Summary: {summary}"
+        )
+
+        rows.append(
+            {
+                "paper_id": paper_id,
+                "title": title,
+                "summary": summary,
+                "authors": authors,
+                "categories": categories,
+                "primary_category": primary_category,
+                "published": published,
+                "updated": updated,
+                "abs_url": abs_url,
+                "pdf_url": pdf_url,
+                "comment": comment,
+                "authors_joined": authors_joined,
+                "categories_joined": categories_joined,
+                "summary_chars": summary_chars,
+                "age_days": age_days,
+                "text_for_embedding": text_for_embedding,
+            }
+        )
+
+    if not rows:
+        return pd.DataFrame()
+
+    df = pd.DataFrame(rows)
+
+    # 5. Drop duplicates và filter row xấu
+    df = df.drop_duplicates(subset=["paper_id"], keep="first")
+    df = df[df["paper_id"].notna() & (df["paper_id"] != "")]
+    df = df[df["title"].notna() & (df["title"] != "")]
+    df = df[df["summary_chars"] >= 30]
+
+    # 6. Sort dataframe
+    df = df.sort_values(by=["published", "paper_id"], ascending=[False, True]).reset_index(drop=True)
+
+    return df
