@@ -104,7 +104,7 @@ python -c "from core.config import load_settings; from evaluation.testset import
 
 ## 8. Phân tích kết quả
 
-> Số liệu đo trên code `main` @ `56788c9` với `LLM_PROVIDER=mock`, theo đúng luồng CP3/CP5: clean → index → evaluate; corrupt bằng `corrupt_clean_dataframe`; repair bằng cách clean lại từ `crossref_records.json`. Cùng một test set 10 câu cho cả 3 trạng thái. Cột **Baseline** đã được đối chiếu với `python script/run_phase1.py` (main @ `cbb3191`): `data/results/baseline_metrics.json`, `data/quality/baseline_quality_report.json` và `freshness_report.json` cho đúng các số bên dưới. Cột Corrupted/Repaired sẽ đối chiếu lại khi `script/run_corruption_flow.py` hoàn thiện.
+> Số liệu đo trên code `main` @ `56788c9` với `LLM_PROVIDER=mock`, theo đúng luồng CP3/CP5: clean → index → evaluate; corrupt bằng `corrupt_clean_dataframe`; repair bằng cách clean lại từ `crossref_records.json`. Cùng một test set 10 câu cho cả 3 trạng thái. Cả 3 cột đã được đối chiếu với artifact chính thức trên main @ `1cae408`: `python script/run_phase1.py` → `data/results/baseline_metrics.json`; `python script/run_corruption_flow.py` → `corrupted_metrics.json`, `repaired_metrics.json`, `data/reports/corruption_report.md`. Chạy `run_corruption_flow.py` 2 lần cho `repaired_metrics.json` và `corrupted_metrics.json` giống hệt nhau (idempotent).
 
 | Metric/signal          | Baseline | Corrupted | Repaired | Nhận xét của cá nhân |
 | ---------------------- | -------: | --------: | -------: | ------------------------- |
