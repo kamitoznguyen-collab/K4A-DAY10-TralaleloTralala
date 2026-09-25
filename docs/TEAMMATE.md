@@ -14,9 +14,9 @@
 | File `.env` | ⚠️ | Đã có, `LLM_PROVIDER=gemini` nhưng **mọi API key đều trống** → `build_llm()` sẽ raise. Không có key thì đặt `LLM_PROVIDER=mock`. **Không commit `.env`** (-20đ). |
 | `data/raw/crossref_response.json` | ✅ | 24 items, `abstract` có tag `<jats:p>` cần bóc. |
 | `data/raw/crossref_records.json` | ✅ | 24 records, `published` từ 2026-03-28 → 2026-07-22. |
-| `src/ingestion/crossref.py` | ❌ | Cả 3 hàm `parse_crossref_payload`, `fetch_source_records`, `load_raw_records` còn `NotImplementedError` → lệnh nghiệm thu CP0 thứ 2 đang fail. |
+| `src/ingestion/crossref.py`, `cleaning.py` | ✅ | Việt Anh đã merge vào `main` (commit `d0ea007`): đủ 3 hàm Crossref + `build_clean_dataframe`. |
 
-**Kết luận: CP0 chưa đạt.** Còn thiếu môi trường + `crossref.py`.
+**Kết luận:** phần code CP0/CP1 của Việt Anh đã có trên `main`. Mỗi người còn phải tự setup môi trường (Python + `.venv` + `.env`) rồi chạy lệnh nghiệm thu CP0/CP1 để xác nhận.
 
 ### Setup môi trường (mọi thành viên đều làm)
 ```powershell
