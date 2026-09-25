@@ -27,6 +27,33 @@ def _fmt_score(val: Any) -> str:
         return str(val)
 
 
+def _expectation_signal(quality: dict[str, Any], exp_type: str, column: str | None = None) -> str:
+    """Describe whether a GX expectation fired on a quality report, using its real result."""
+    for exp in quality.get("expectations", []):
+        if exp.get("expectation_type") != exp_type:
+            continue
+        if column is not None and exp.get("kwargs", {}).get("column") != column:
+            continue
+        result = exp.get("result", {}) or {}
+        if exp.get("success"):
+            observed = result.get("observed_value")
+            suffix = f" (observed = {observed})" if observed is not None else ""
+            return f"❌ Not caught in this run — expectation passed{suffix}"
+        unexpected = result.get("unexpected_count")
+        suffix = f" ({unexpected} unexpected values)" if unexpected is not None else ""
+        return f"✅ Caught in this run{suffix}"
+    return "N/A — expectation not present in the quality report"
+
+
+def _recovery(repaired: Any, baseline: Any) -> str:
+    """Compare a repaired value against baseline and label the recovery honestly."""
+    try:
+        restored = abs(float(repaired) - float(baseline)) < 1e-9
+    except (TypeError, ValueError):
+        restored = repaired == baseline
+    return "🟢 Fully Restored" if restored else "🔴 Not Restored"
+
+
 def generate_phase1_report(
     report_path: Path | str,
     source_summary: dict[str, Any],
@@ -185,7 +212,7 @@ Using ChromaDB collection `papers-baseline` with sentence-transformer `all-MiniL
 | **Retrieval Hit Rate** | **{_fmt_pct(hit_rate)}** | Fraction of queries where ground-truth document was retrieved in Top-K |
 | **Mean Token F1** | **{_fmt_score(token_f1)}** | Unigram token overlap between RAG response and ground truth |
 | **Judge Accuracy** | **{_fmt_pct(judge_acc)}** | LLM judge binary accuracy score |
-| **Mean Judge Score** | **{_fmt_score(judge_score)}** | Normalized scalar quality score (0.0 – 1.0) |
+| **Mean Judge Score** | **{_fmt_score(judge_score)}** | Mean judge score on a 1 – 5 scale (5 = fully correct) |
 
 {f"### RAGAS Metrics\\n```json\\n{ragas_dict}\\n```" if ragas_dict and not ragas_dict.get("error") else ""}
 
@@ -208,6 +235,8 @@ def generate_corruption_report(
     repaired_quality: dict[str, Any],
     corrupted_freshness: dict[str, Any],
     repaired_freshness: dict[str, Any],
+    baseline_quality: dict[str, Any] | None = None,
+    baseline_freshness: dict[str, Any] | None = None,
 ) -> None:
     """Generate comprehensive markdown report comparing Baseline vs Corrupted vs Repaired states.
 
@@ -226,9 +255,13 @@ def generate_corruption_report(
         repaired_quality: GX 1.x quality output on repaired data.
         corrupted_freshness: Freshness report on corrupted data.
         repaired_freshness: Freshness report on repaired data.
+        baseline_quality: GX 1.x quality output on baseline data (data/quality/baseline_quality_report.json).
+        baseline_freshness: Freshness report on baseline data (data/quality/freshness_report.json).
     """
     path = Path(report_path)
     now_str = now_utc().isoformat()
+    baseline_quality = baseline_quality or {}
+    baseline_freshness = baseline_freshness or {}
 
     # Baseline metrics
     b_hit = baseline_metrics.get("retrieval_hit_rate", 1.0)
@@ -248,24 +281,56 @@ def generate_corruption_report(
     r_acc = repaired_metrics.get("judge_accuracy", b_acc)
     r_score = repaired_metrics.get("mean_judge_score", b_score)
 
-    # Quality statuses
-    c_gx = corrupted_quality.get("success", False)
-    r_gx = repaired_quality.get("success", True)
-    c_gx_str = "❌ FAILED" if not c_gx else "✅ PASSED"
-    r_gx_str = "✅ PASSED" if r_gx else "❌ FAILED"
+    # Quality statuses (all read from the actual GX reports)
+    def _gx_str(quality: dict[str, Any]) -> str:
+        if "success" not in quality:
+            return "N/A"
+        return "✅ PASSED" if quality["success"] else "❌ FAILED"
+
+    b_gx_str = _gx_str(baseline_quality)
+    c_gx_str = _gx_str(corrupted_quality)
+    r_gx_str = _gx_str(repaired_quality)
 
     # Freshness statuses
-    c_fresh = corrupted_freshness.get("is_fresh", False)
-    r_fresh = repaired_freshness.get("is_fresh", True)
-    c_fresh_str = "⚠️ ALERT (Stale)" if not c_fresh else "✅ COMPLIANT"
-    r_fresh_str = "✅ COMPLIANT" if r_fresh else "⚠️ ALERT"
+    def _fresh_str(freshness: dict[str, Any]) -> str:
+        if "is_fresh" not in freshness:
+            return "N/A"
+        return "✅ COMPLIANT" if freshness["is_fresh"] else "⚠️ ALERT (Stale)"
 
+    b_fresh_str = _fresh_str(baseline_freshness)
+    c_fresh_str = _fresh_str(corrupted_freshness)
+    r_fresh_str = _fresh_str(repaired_freshness)
+
+    b_stale_ratio = baseline_freshness.get("stale_ratio")
     c_stale_ratio = corrupted_freshness.get("stale_ratio", 0.0)
     r_stale_ratio = repaired_freshness.get("stale_ratio", 0.0)
 
     # Row counts
+    b_rows = baseline_quality.get("total_rows", baseline_freshness.get("total_rows", "N/A"))
     c_rows = corrupted_quality.get("total_rows", "N/A")
-    r_rows = repaired_quality.get("total_rows", 24)
+    r_rows = repaired_quality.get("total_rows", "N/A")
+
+    # Corruption signals, read from the corrupted GX report instead of assumed
+    drop_signal = _expectation_signal(corrupted_quality, "expect_table_row_count_to_be_between")
+    blank_signal = _expectation_signal(corrupted_quality, "expect_column_value_lengths_to_be_between", "summary")
+    title_signal = _expectation_signal(corrupted_quality, "expect_column_value_lengths_to_be_between", "title")
+    dup_signal = _expectation_signal(corrupted_quality, "expect_column_values_to_be_unique", "paper_id")
+    stale_signal = (
+        f"{'✅ Caught' if corrupted_freshness.get('is_fresh') is False else '❌ Not caught'} in this run — "
+        f"stale ratio {_fmt_pct(c_stale_ratio)} ({corrupted_freshness.get('stale_rows', 'N/A')}/"
+        f"{corrupted_freshness.get('total_rows', 'N/A')} rows) vs 25% threshold"
+    )
+    r_stats = repaired_quality.get("statistics", {}) or {}
+    r_exp_total = r_stats.get("evaluated_expectations", len(repaired_quality.get("expectations", [])))
+    r_exp_ok = r_stats.get("successful_expectations", sum(1 for e in repaired_quality.get("expectations", []) if e.get("success")))
+    metrics_restored = all(
+        _recovery(r, b).startswith("🟢") for r, b in ((r_hit, b_hit), (r_f1, b_f1), (r_acc, b_acc), (r_score, b_score))
+    )
+    repair_metrics_line = (
+        "Metrics in Repaired state match Baseline exactly"
+        if metrics_restored
+        else "⚠️ Metrics in Repaired state do NOT fully match Baseline"
+    )
 
     # Delta calculations
     def _diff_pct(val_new, val_old) -> str:
@@ -304,7 +369,7 @@ This report delivers an end-to-end comparative study across three distinct opera
 2. **Corrupted State:** Synthetic injection of 6 real-world data failures (record loss, empty summaries, text noise, title truncation, artificial staleness, duplicate keys).
 3. **Repaired State:** Deterministic recovery using an **Idempotent Repair** strategy rebuilding from the immutable raw snapshot.
 
-The findings establish that without Data Observability, downstream RAG agents suffer from severe **Silent Failure**—confidently returning hallucinated or inaccurate answers without raising runtime errors. The Great Expectations 1.x quality gates and Freshness SLA successfully flag every corrupted dimension, and the idempotent repair flow restores 100% of pipeline performance.
+The findings establish that without Data Observability, downstream RAG agents suffer from severe **Silent Failure**—confidently returning hallucinated or inaccurate answers without raising runtime errors. Section 3 lists, for each corruption, whether the Great Expectations 1.x suite or the Freshness SLA actually flagged it in this run; the comparison matrix shows how far the idempotent repair restored each metric.
 
 ---
 
@@ -312,14 +377,14 @@ The findings establish that without Data Observability, downstream RAG agents su
 
 | Metric / Health Indicator | 1. Baseline (Clean) | 2. Corrupted (Degraded) | 3. Repaired (Restored) | Delta (Corrupted vs Baseline) | Recovery Health |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| **Retrieval Hit Rate** | **{_fmt_pct(b_hit)}** | **{_fmt_pct(c_hit)}** | **{_fmt_pct(r_hit)}** | `{hit_delta}` | 🟢 Fully Restored (100%) |
-| **Mean Token F1** | **{_fmt_score(b_f1)}** | **{_fmt_score(c_f1)}** | **{_fmt_score(r_f1)}** | `{f1_delta}` | 🟢 Fully Restored |
-| **Judge Accuracy** | **{_fmt_pct(b_acc)}** | **{_fmt_pct(c_acc)}** | **{_fmt_pct(r_acc)}** | `{acc_delta}` | 🟢 Fully Restored |
-| **Mean Judge Score** | **{_fmt_score(b_score)}** | **{_fmt_score(c_score)}** | **{_fmt_score(r_score)}** | `{_diff_val(c_score, b_score)}` | 🟢 Fully Restored |
-| **GX 1.x Quality Gate** | **✅ PASSED** | **{c_gx_str}** | **{r_gx_str}** | Expectations Breached | 🟢 Fully Restored |
-| **Freshness SLA (`is_fresh`)** | **✅ COMPLIANT** | **{c_fresh_str}** | **{r_fresh_str}** | SLA Violation Triggered | 🟢 Fully Restored |
-| **Stale Ratio (>180d)** | **<= 25.0%** | **{_fmt_pct(c_stale_ratio)}** | **{_fmt_pct(r_stale_ratio)}** | Spike in Stale Papers | 🟢 Normalized |
-| **Active Record Count** | **24 rows** | **{c_rows} rows** | **{r_rows} rows** | Record Count Variance | 🟢 24 Rows Exact |
+| **Retrieval Hit Rate** | **{_fmt_pct(b_hit)}** | **{_fmt_pct(c_hit)}** | **{_fmt_pct(r_hit)}** | `{hit_delta}` | {_recovery(r_hit, b_hit)} |
+| **Mean Token F1** | **{_fmt_score(b_f1)}** | **{_fmt_score(c_f1)}** | **{_fmt_score(r_f1)}** | `{f1_delta}` | {_recovery(r_f1, b_f1)} |
+| **Judge Accuracy** | **{_fmt_pct(b_acc)}** | **{_fmt_pct(c_acc)}** | **{_fmt_pct(r_acc)}** | `{acc_delta}` | {_recovery(r_acc, b_acc)} |
+| **Mean Judge Score** | **{_fmt_score(b_score)}** | **{_fmt_score(c_score)}** | **{_fmt_score(r_score)}** | `{_diff_val(c_score, b_score)}` | {_recovery(r_score, b_score)} |
+| **GX 1.x Quality Gate** | **{b_gx_str}** | **{c_gx_str}** | **{r_gx_str}** | {'Expectations Breached' if c_gx_str != b_gx_str else 'No Change'} | {_recovery(r_gx_str, b_gx_str)} |
+| **Freshness SLA (`is_fresh`)** | **{b_fresh_str}** | **{c_fresh_str}** | **{r_fresh_str}** | {'SLA Violation Triggered' if c_fresh_str != b_fresh_str else 'No Change'} | {_recovery(r_fresh_str, b_fresh_str)} |
+| **Stale Ratio (>180d)** | **{_fmt_pct(b_stale_ratio)}** | **{_fmt_pct(c_stale_ratio)}** | **{_fmt_pct(r_stale_ratio)}** | `{_diff_pct(c_stale_ratio, b_stale_ratio)}` | {_recovery(r_stale_ratio, b_stale_ratio)} |
+| **Active Record Count** | **{b_rows} rows** | **{c_rows} rows** | **{r_rows} rows** | `{_diff_val(c_rows, b_rows).split('.')[0]}` rows | {_recovery(r_rows, b_rows)} |
 
 ---
 
@@ -330,32 +395,32 @@ Each corruption scenario models a critical vulnerability frequently encountered 
 ### 1. Drop Latest Records (~20% Newest Papers Removed)
 - **Mechanism:** Drops records published in the most recent time window.
 - **RAG Impact:** Directly reduces **Retrieval Hit Rate** on evaluation queries targeting recent research (e.g. latest papers from July 2026). The vector retriever cannot find ground-truth papers because they no longer exist in the index.
-- **Observability Signal:** Caught by `ExpectTableRowCountToBeBetween(min_value=20, max_value=30)`, failing immediately when row count falls to ~19.
+- **Observability Signal:** `ExpectTableRowCountToBeBetween(min_value=20, max_value=30)` → {drop_signal}. The newest papers disappear (latest published: {corrupted_freshness.get('latest_published', 'N/A')} vs {baseline_freshness.get('latest_published', 'N/A')} at baseline), which the row-count range alone does not guarantee to detect.
 
 ### 2. Blank Summary (`summary = ""`)
 - **Mechanism:** Simulates scrapers or APIs returning null/empty string payloads.
-- **RAG Impact:** Questions requiring summary synthesis (`What is '<Title>' about?`) receive empty or completely irrelevant retrieved context chunks, crippling Token F1 and Judge Accuracy.
-- **Observability Signal:** Caught by `ExpectColumnValueLengthsToBeBetween(column="summary", min_value=30)`.
+- **RAG Impact:** Summary questions on affected papers lose their answer context; the metric impact depends on whether affected papers are in the test set.
+- **Observability Signal:** `ExpectColumnValueLengthsToBeBetween(column="summary", min_value=30)` → {blank_signal}.
 
 ### 3. Noise Injection (Garbage String Synthesis)
 - **Mechanism:** Inserts high-entropy random character strings into summaries.
 - **RAG Impact:** Severely distorts embedding vector representations generated by `sentence-transformers/all-MiniLM-L6-v2`, drifting cosine similarity distances and causing top-k retrieval to fetch irrelevant neighbors.
-- **Observability Signal:** Detected through semantic token degradation and quality anomaly monitoring.
+- **Observability Signal:** ❌ Not covered by the current GX suite — noisy summaries keep their length, so no expectation fires. A character-validity expectation would be needed.
 
 ### 4. Truncate Title (`len(title) < 8`)
 - **Mechanism:** Cuts paper titles to abbreviated fragments (e.g. `"Adv..."`).
 - **RAG Impact:** Exact title lookup and semantic entity recognition break down. Questions querying `"Who authored '<Title>'?"` fail retrieval lookup entirely.
-- **Observability Signal:** Caught by `ExpectColumnValueLengthsToBeBetween(column="title", min_value=8)`.
+- **Observability Signal:** `ExpectColumnValueLengthsToBeBetween(column="title", min_value=8)` → {title_signal}.
 
 ### 5. Stale Date Mutation (Backdating > 180 Days)
 - **Mechanism:** Shifts published dates backwards by 180–365 days and increments `age_days`.
 - **RAG Impact:** Stale literature can provide superseded scientific conclusions without breaking retrieval query mechanics.
-- **Observability Signal:** Caught by the **Freshness SLA Monitor**, where the ratio of stale rows climbs past the 25% threshold, triggering `is_fresh = False`.
+- **Observability Signal:** Freshness SLA Monitor → {stale_signal}.
 
 ### 6. Duplicate Rows Injection
 - **Mechanism:** Clones existing records, injecting duplicate `paper_id` keys into the dataset.
 - **RAG Impact:** Introduces redundant vector chunks in ChromaDB, skewing top-k retrieval diversity and wasting token context windows.
-- **Observability Signal:** Caught by `ExpectColumnValuesToBeUnique(column="paper_id")`.
+- **Observability Signal:** `ExpectColumnValuesToBeUnique(column="paper_id")` → {dup_signal}.
 
 ---
 
@@ -380,9 +445,9 @@ Rather than attempting "in-place surgical patching" on corrupted in-memory DataF
 4. Re-validate through the Great Expectations 1.x suite and Freshness SLA.
 
 ### Proof of Idempotency
-- Running `run_corruption_flow.py` multiple consecutive times produces bit-exact `repaired_metrics.json` artifacts.
-- Metrics in Repaired state match Baseline state across all decimal places (`Retrieval Hit Rate = {_fmt_pct(r_hit)}`, `Mean Token F1 = {_fmt_score(r_f1)}`).
-- All 4 Great Expectations return `success = True`, and the Freshness SLA returns `is_fresh = True`.
+- Repair always rebuilds from the same raw snapshot with deterministic cleaning, so re-running `run_corruption_flow.py` reproduces the same `repaired_metrics.json`.
+- {repair_metrics_line} (`Retrieval Hit Rate = {_fmt_pct(r_hit)}` vs `{_fmt_pct(b_hit)}`, `Mean Token F1 = {_fmt_score(r_f1)}` vs `{_fmt_score(b_f1)}`).
+- Great Expectations on repaired data: {r_exp_ok}/{r_exp_total} expectations passed (`success = {repaired_quality.get('success')}`); Freshness SLA `is_fresh = {repaired_freshness.get('is_fresh')}`.
 
 ---
 

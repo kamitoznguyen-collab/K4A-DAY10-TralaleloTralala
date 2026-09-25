@@ -219,6 +219,8 @@ def run_corruption_flow(settings: Settings | None = None) -> dict[str, Any]:
         repaired_quality=repaired_quality,
         corrupted_freshness=corrupted_freshness,
         repaired_freshness=repaired_freshness,
+        baseline_quality=baseline_quality,
+        baseline_freshness=baseline_freshness,
     )
 
     # ──────────────────────────────────────────────────────────────────────────
@@ -237,14 +239,14 @@ def run_corruption_flow(settings: Settings | None = None) -> dict[str, Any]:
     print(
         f"  {'GX 1.x Quality Gate':<28} | "
         f"{'PASSED' if baseline_quality.get('success') else 'FAILED':<14} | "
-        f"{'FAILED (Alarm)':<14} | "
-        f"{'PASSED':<14}"
+        f"{'PASSED' if corrupted_quality.get('success') else 'FAILED (Alarm)':<14} | "
+        f"{'PASSED' if repaired_quality.get('success') else 'FAILED':<14}"
     )
     print(
         f"  {'Freshness SLA (180d)':<28} | "
-        f"{'COMPLIANT':<14} | "
-        f"{'VIOLATED':<14} | "
-        f"{'COMPLIANT':<14}"
+        f"{'COMPLIANT' if baseline_freshness.get('is_fresh') else 'VIOLATED':<14} | "
+        f"{'COMPLIANT' if corrupted_freshness.get('is_fresh') else 'VIOLATED':<14} | "
+        f"{'COMPLIANT' if repaired_freshness.get('is_fresh') else 'VIOLATED':<14}"
     )
     print(
         f"  {'Retrieval Hit Rate':<28} | "
@@ -265,7 +267,15 @@ def run_corruption_flow(settings: Settings | None = None) -> dict[str, Any]:
         f"{_format_pct(r_acc):<14}"
     )
     print("=" * 80)
-    print("  [CP5] IDEMPOTENT REPAIR VERIFIED: REPAIRED STATE 100% RECOVERS BASELINE PERFORMANCE")
+    recovered = (
+        (r_hit, r_f1, r_acc) == (b_hit, b_f1, b_acc)
+        and bool(repaired_quality.get("success"))
+        and bool(repaired_freshness.get("is_fresh"))
+    )
+    if recovered:
+        print("  [CP5] IDEMPOTENT REPAIR VERIFIED: REPAIRED STATE 100% RECOVERS BASELINE PERFORMANCE")
+    else:
+        print("  [CP5] WARNING: REPAIRED STATE DOES NOT FULLY MATCH BASELINE — CHECK THE REPORT")
     print("=" * 80 + "\n")
 
     return {
