@@ -33,7 +33,9 @@ def run_data_quality_checks(
     Returns:
         Dictionary containing overall 'success' flag, statistics, and individual expectation results.
     """
-    clean_name = safe_slug(str(report_name).replace(".json", ""))
+    # Callers may pass a full path; keep only the file stem so reports never embed machine-specific paths.
+    report_label = Path(str(report_name)).stem
+    clean_name = safe_slug(report_label)
 
     context = gx.get_context(mode="ephemeral")
     data_source = context.data_sources.add_pandas(name=f"papers_source_{clean_name}")
@@ -94,7 +96,7 @@ def run_data_quality_checks(
     overall_success = bool(val_result.success)
 
     report_payload: dict[str, Any] = {
-        "report_name": str(report_name),
+        "report_name": report_label,
         "success": overall_success,
         "statistics": stats_dict,
         "expectations": expectation_details,
