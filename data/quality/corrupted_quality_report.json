@@ -1,0 +1,189 @@
+{
+  "report_name": "corrupted_quality_report",
+  "success": false,
+  "statistics": {
+    "evaluated_expectations": 7,
+    "successful_expectations": 4,
+    "unsuccessful_expectations": 3,
+    "success_percent": 57.14285714285714
+  },
+  "expectations": [
+    {
+      "expectation_type": "expect_table_row_count_to_be_between",
+      "kwargs": {
+        "batch_id": "papers_source_corrupted-quality-report-papers_asset_corrupted-quality-report",
+        "min_value": 20,
+        "max_value": 30
+      },
+      "success": true,
+      "result": {
+        "observed_value": 22
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": {
+        "batch_id": "papers_source_corrupted-quality-report-papers_asset_corrupted-quality-report",
+        "column": "paper_id"
+      },
+      "success": true,
+      "result": {
+        "element_count": 22,
+        "unexpected_count": 0,
+        "unexpected_percent": 0.0,
+        "partial_unexpected_list": [],
+        "partial_unexpected_counts": [],
+        "partial_unexpected_index_list": []
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_unique",
+      "kwargs": {
+        "batch_id": "papers_source_corrupted-quality-report-papers_asset_corrupted-quality-report",
+        "column": "paper_id"
+      },
+      "success": false,
+      "result": {
+        "element_count": 22,
+        "unexpected_count": 4,
+        "unexpected_percent": 18.181818181818183,
+        "partial_unexpected_list": [
+          "10.1145/3637528.3671819",
+          "10.1145/3637528.3671817",
+          "10.1145/3637528.3671819",
+          "10.1145/3637528.3671817"
+        ],
+        "missing_count": 0,
+        "missing_percent": 0.0,
+        "unexpected_percent_total": 18.181818181818183,
+        "unexpected_percent_nonmissing": 18.181818181818183,
+        "partial_unexpected_counts": [
+          {
+            "value": "10.1145/3637528.3671817",
+            "count": 2
+          },
+          {
+            "value": "10.1145/3637528.3671819",
+            "count": 2
+          }
+        ],
+        "partial_unexpected_index_list": [
+          7,
+          9,
+          20,
+          21
+        ]
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": {
+        "batch_id": "papers_source_corrupted-quality-report-papers_asset_corrupted-quality-report",
+        "column": "title"
+      },
+      "success": true,
+      "result": {
+        "element_count": 22,
+        "unexpected_count": 0,
+        "unexpected_percent": 0.0,
+        "partial_unexpected_list": [],
+        "partial_unexpected_counts": [],
+        "partial_unexpected_index_list": []
+      }
+    },
+    {
+      "expectation_type": "expect_column_value_lengths_to_be_between",
+      "kwargs": {
+        "batch_id": "papers_source_corrupted-quality-report-papers_asset_corrupted-quality-report",
+        "column": "title",
+        "min_value": 8
+      },
+      "success": false,
+      "result": {
+        "element_count": 22,
+        "unexpected_count": 3,
+        "unexpected_percent": 13.636363636363635,
+        "partial_unexpected_list": [
+          "Adv",
+          "Agenti",
+          "Chu"
+        ],
+        "missing_count": 0,
+        "missing_percent": 0.0,
+        "unexpected_percent_total": 13.636363636363635,
+        "unexpected_percent_nonmissing": 13.636363636363635,
+        "partial_unexpected_counts": [
+          {
+            "value": "Adv",
+            "count": 1
+          },
+          {
+            "value": "Agenti",
+            "count": 1
+          },
+          {
+            "value": "Chu",
+            "count": 1
+          }
+        ],
+        "partial_unexpected_index_list": [
+          1,
+          14,
+          17
+        ]
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": {
+        "batch_id": "papers_source_corrupted-quality-report-papers_asset_corrupted-quality-report",
+        "column": "text_for_embedding"
+      },
+      "success": true,
+      "result": {
+        "element_count": 22,
+        "unexpected_count": 0,
+        "unexpected_percent": 0.0,
+        "partial_unexpected_list": [],
+        "partial_unexpected_counts": [],
+        "partial_unexpected_index_list": []
+      }
+    },
+    {
+      "expectation_type": "expect_column_value_lengths_to_be_between",
+      "kwargs": {
+        "batch_id": "papers_source_corrupted-quality-report-papers_asset_corrupted-quality-report",
+        "column": "summary",
+        "min_value": 30
+      },
+      "success": false,
+      "result": {
+        "element_count": 22,
+        "unexpected_count": 3,
+        "unexpected_percent": 13.636363636363635,
+        "partial_unexpected_list": [
+          "",
+          "",
+          ""
+        ],
+        "missing_count": 0,
+        "missing_percent": 0.0,
+        "unexpected_percent_total": 13.636363636363635,
+        "unexpected_percent_nonmissing": 13.636363636363635,
+        "partial_unexpected_counts": [
+          {
+            "value": "",
+            "count": 3
+          }
+        ],
+        "partial_unexpected_index_list": [
+          0,
+          3,
+          8
+        ]
+      }
+    }
+  ],
+  "evaluated_at": "2026-09-25T10:22:21.937043+00:00",
+  "total_rows": 22
+}
